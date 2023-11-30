@@ -1,7 +1,10 @@
-# Philip Casey, 2023
+# HealthCheck
 # This script enables Health Check on Distributed Switches
+# VMware vSphere 8
+# PowerCLI 13.1
 # Reference: VMware Code Capture
-# Integrated by Philip Casey
+# Adapted by Philip Casey, 2023
+# https://GitHub.com/PhilipCasey
 
 # Type name of distributed switches in quotes. Add or remove the number of distributed switches you need to enable.
 $vDS1 = ""
