@@ -1,0 +1,70 @@
+# Simple Powershell RAW Metar Converter Project
+# Created by Philip Casey
+######################################################################################
+
+# Insert RAW Metar Data in Variable
+$metar = "METAR KCHS 212135Z 00000KT 10SM BKN049 27/16 A2999 RMK AO2 SLP154 T02780167"
+
+# Split the string into an array so each item can be assigned based on its format
+$metarArray = $metar.Split(" ")
+
+######################################################################################
+# Functions Used Later
+# To convert Zulu time to EST time
+function convertToLocal($zulu){
+    $time = [timespan]::ParseExact("$zulu", 'hhmm', $null)
+    $ESToffset = [timespan]::ParseExact('0400', 'hhmm', $null)
+    $EST = $time - $ESToffset
+    $12hrclock = [timespan]::ParseExact('1200', 'hhmm', $null)
+    $12hr = ($EST - $12hrclock).ToString("hh':'mm")
+    if($EST.Hours -lt 12){
+    $Script:LocalTime = "$12hr AM EDT"
+    } else {
+    $Script:LocalTime = "$12hr PM EDT"
+    }
+}
+
+# Convert Celsius to Fahrenheit
+function convertToFahrenheit($C){
+    $script:F = ([MATH]::Round([int]$C*9/5+32))
+}
+######################################################################################
+
+#Run switch assignment on every item in the Metar Array and output the results
+foreach($item in $metarArray){
+    switch ($item){
+    #Location & Time
+    {($_ -like "K*")}   {write-host "$_"}
+    {($_ -like "*Z")}   {
+        $Zulu=([int]$_.Substring(2,4))
+        ConvertToLocal($zulu)
+        write-host "Time" $LocalTime
+    }
+
+    # Wind and Vis
+    {($_ -like "00000*")}  {write-host "Winds calm"}
+    {($_ -like "VRB*") -and ($_ -notlike "00000*") -and ($_ -notlike "*G*")}  {
+        write-host "Variable at" ([MATH]::Round(([int]$_.Substring(3,2))*1.15))"MPH"
+    }
+    {($_ -like "*KT")  -and ($_ -notlike "00000*") -and ($_ -notlike "*G*") -and ($_ -notlike "VRB*")}  {
+        write-host "Wind" ($_.Substring(0,3))"° at" ([MATH]::Round(([int]$_.Substring(3,2))*1.15))"MPH"
+    }
+    {($_ -like "*KT")  -and ($_ -notlike "00000*") -and ($_ -like "*G*") -and ($_ -notlike "VRB*")}  {
+        write-host "Wind" ($_.Substring(0,3))"° at" ([MATH]::Round(([int]$_.Substring(3,2))*1.15))"-"([MATH]::Round(([int]$_.Substring(6,2))*1.15))"MPH"
+        }
+    {($_ -like "*SM")}  {write-host "Visibility"  ($_.Substring(0,2))"sm"}
+
+    #Clouds
+    {($_ -like "CLR")}  {write-host "Clear below 12,000"}
+    {($_ -like "FEW*")} {write-host "Few"((([int]$_.Substring(3,3))*100).ToString("N0"))}
+    {($_ -like "SCT*")} {write-host "Scattered"((([int]$_.Substring(3,3))*100).ToString("N0"))}
+    {($_ -like "BKN*")} {write-host "Broken"((([int]$_.Substring(3,3))*100).ToString("N0"))}
+    {($_ -like "OVC*")} {write-host "Overcast"((([int]$_.Substring(3,3))*100).ToString("N0"))}
+    #Temp
+    {($_ -like "*/*")}  {$C = convertToFahrenheit(($_.Substring(0,2))); write-host "Temperature" ([int]$_.Substring(0,2))"°C ($F°F)"}
+    {($_ -like "*/*")}  {$C = convertToFahrenheit(($_.Substring(3,2))); write-host "Dewpoint" ([int]$_.Substring(3,2))"°C ($F°F)"}
+    #ALT
+    {($_.Length -eq 5) -and ($_ -like "*A*") -and ($_ -notcontains "METAR")} {write-host "Altimeter" (([int]$_.Substring(1,4))/100)"inHg"}
+
+    }
+}
