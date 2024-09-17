@@ -5,6 +5,9 @@
 # The following commands are built on 9.1.0-2771_A00
 # You can find the installer at https://www.dell.com/support/home/en-ca/drivers/driversdetails?driverid=n3gc9  >  OM-DRAC-Dell-Web-WINX64-9.1.0-2771_A00.exe
 
+# Important, you may need to create an alias for the RACADM exe path for Powershell to know where it is.
+Set-Alias racadm 'C:\Program Files\Dell\SysMgt\rac5\racadm.exe'
+
 # RACADM is the command you will use to send commands to iDRAC
 # RACADM -r tells it to start a remote session to the ip address specified after it. Example: RACADM -R 192.168.1.1
 #        after the IP address you will specify a useranme with -u and password with -p
