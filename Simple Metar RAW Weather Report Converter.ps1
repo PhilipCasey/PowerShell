@@ -147,11 +147,11 @@ param(
     [double]$dewp
 )
 
-$expDewp = [math]::Exp((17.625 * $dewp) / (243.04 + $dewp))
-$expTemp = [math]::Exp((17.625 * $temp) / (243.04 + $temp))
+    $expDewp = [math]::Exp((17.625 * $dewp) / (243.04 + $dewp))
+    $expTemp = [math]::Exp((17.625 * $temp) / (243.04 + $temp))
 
-$RH = 100 * ($expDewp / $expTemp)
-$RH = [math]::Round($RH)
+    $RH = 100 * ($expDewp / $expTemp)
+    $RH = [math]::Round($RH)
 
 return $RH
 
@@ -160,18 +160,19 @@ return $RH
 ############################################################################################
 
 function Get-DensityAltitude(){
-param(
-    [double]$altimeter
-)
 
-# Density Altitude = Pressure Altitude + [120 × (OAT − ISA Temp)]
+    # Density Altitude = Pressure Altitude + [120 × (OAT − ISA Temp)]
 
-$PA = [math]::Round((29.92 - $converterAltimeter) * 1000 + $metarAPI.elev)
-$ISA = 15 - (2 * ([Math]::Round($PA / 1000)))
+    # Calculate Pressure Altitude
+    # https://www.weather.gov/epz/wxcalc_pressurealtitude
+    # https://www.weather.gov/media/epz/wxcalc/pressureAltitude.pdf
+    $PA = [Math]::Round(((1 - [math]::Pow(($metarapi.altim/1013.25), 0.190284)) * 145366.45) + $metarapi.elev)
 
-$DA = $PA + (120 * ($metarAPI.temp - $ISA))
-$DA = "{0:N0}" -f $DA
-return $DA
+    $ISA = 15 - (($PA / 1000) * 2 )
+
+    $DA = $PA + (($metarAPI.temp - $ISA) * 120)
+    $DA = "{0:N0}" -f $DA
+    return $DA
 
 }
 
@@ -221,7 +222,7 @@ function Convert-Metar($metar){
 
     # Density Altitude
     $DA = Get-DensityAltitude -altimeter $converterAltimeter
-    $metarOutput.Add("Density Altitude (incorrect, due to wrong field elevation in API","$DA'")
+    $metarOutput.Add("Density Altitude (incorrect, due to wrong field elevation in API)","$DA'")
 
     return $metarOutput
 
