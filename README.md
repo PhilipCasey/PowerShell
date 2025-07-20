@@ -1,2 +1,2 @@
 # PowerCLI
-VMware PowerCLI scripts for PowerShell
+Random scripts for PowerShell
