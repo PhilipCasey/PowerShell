@@ -228,4 +228,5 @@ function Convert-Metar($metar){
 #end of function
 }
 
+# Run the function to pull the metar and convert it to readable text.
 Convert-Metar -metar $metarAPI 
