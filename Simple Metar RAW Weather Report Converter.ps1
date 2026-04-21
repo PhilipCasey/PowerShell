@@ -99,16 +99,19 @@ function Convert-Clouds(){
     # Create new variable for arraylist
     $cloudOutput = @()
 
-    foreach($cloud in $metarAPI){
-        switch($cloud){
-                { ($_.cover -eq "CLR") } { $cloudOutput  = "Clear below 12,000" }
-                { ($_.cover -eq "FEW") } { $cloudOutput += "Few" + " " + ("{0:N0}" -f $($_.base)) + "'"     }
-                { ($_.cover -eq "SCT") } { $cloudOutput += "Scattered" + " " + ("{0:N0}" -f $($_.base)) + "'"     }
-                { ($_.cover -eq "BKN") } { $cloudOutput += "Broken" + " " + ("{0:N0}" -f $($_.base)) + "'"      }
-                { ($_.cover -eq "OVC") } { $cloudOutput += "Overcast" + " " + ("{0:N0}" -f $($_.base)) + "'"      }
+    if($metarAPI.cover -eq "CLR"){
+        $cloudOutput  = "Clear below 12,000"
+    } else {
+        foreach($cloud in $metarAPI.clouds){
+            switch($cloud){
+                    { ($_.cover -eq "CLR") -or ($_.cover -eq $null)} { $cloudOutput  = "Clear below 12,000" }
+                    { ($_.cover -eq "FEW") } { $cloudOutput += "Few" + " " + ("{0:N0}" -f $($_.base)) + "'"     }
+                    { ($_.cover -eq "SCT") } { $cloudOutput += "Scattered" + " " + ("{0:N0}" -f $($_.base)) + "'"     }
+                    { ($_.cover -eq "BKN") } { $cloudOutput += "Broken" + " " + ("{0:N0}" -f $($_.base)) + "'"      }
+                    { ($_.cover -eq "OVC") } { $cloudOutput += "Overcast" + " " + ("{0:N0}" -f $($_.base)) + "'"      }
+            }
         }
     }
-
     return $cloudOutput
 }
 
