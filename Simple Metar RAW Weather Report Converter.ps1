@@ -3,7 +3,7 @@
 ######################################################################################
 
 # Input the full airport identifier
-$airportID = "KCHS"
+$airportID = "KGGE"
 
 ######################################################################################
 
@@ -99,7 +99,7 @@ function Convert-Clouds(){
     # Create new variable for arraylist
     $cloudOutput = @()
 
-    foreach($cloud in $metarAPI.clouds){
+    foreach($cloud in $metarAPI){
         switch($cloud){
                 { ($_.cover -eq "CLR") } { $cloudOutput  = "Clear below 12,000" }
                 { ($_.cover -eq "FEW") } { $cloudOutput += "Few" + " " + ("{0:N0}" -f $($_.base)) + "'"     }
@@ -110,14 +110,13 @@ function Convert-Clouds(){
     }
 
     return $cloudOutput
-
 }
 
 ######################################################################################
 
 function Convert-altimeter(){
     # Parcel Altimeter from raw data
-    $altimeter = (($metarAPI.rawOb).Split(" ") | Where-Object {($_.Length -eq 5) -and ($_ -like "*A*")}).Substring(1,4)/100
+    $altimeter = (($metarAPI.rawOb).Split(" ") | Where-Object {($_.Length -eq 5) -and ($_ -like "*A*") -and ($_ -notlike "*METAR*")}).Substring(1,4)/100
     $altimeter = "{0:F2}" -f $altimeter
 
     return $altimeter
