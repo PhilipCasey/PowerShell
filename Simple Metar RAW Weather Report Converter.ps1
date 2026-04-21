@@ -3,22 +3,42 @@
 ######################################################################################
 
 # Input the full airport identifier
-$airportID = "KGGE"
+$stationID = "KGGE"
+$queryCache = $false
 
 ######################################################################################
 
 # GET Metar from Aviation Weather Center API
-$metarAPI = curl.exe -X 'GET' "https://aviationweather.gov/api/data/metar?ids=$airportID&format=json" -H 'accept: */*' 2>$null | ConvertFrom-Json
+$metarAPI = curl.exe -X 'GET' "https://aviationweather.gov/api/data/metar?ids=$stationID&format=json" -H 'accept: */*' 2>$null | ConvertFrom-Json
 
 # Split the string into an array so each item can be assigned based on its format
 $metarArray = ($metarAPI.rawOb).Split(" ")
+
+
+#AviationWeather.gov asks you to pull from the cache file instead of making multiple API requests
+if($queryCache){
+    #https://aviationweather.gov/data/cache/metars.cache.xml.gz
+    #You need to Unzip the GZ file to get the XML
+
+    #<Create function to download and unzip GZ file>
+
+    # Import XML file
+    [xml]$metarCached = Get-Content "Z:\PowerShell Scripts\PowerShell\Metar\metars.cache.xml"
+    $metarXML = (Select-Xml -Path "Z:\PowerShell Scripts\PowerShell\Metar\metars.cache.xml" -XPath "//METAR" | where {$_ -match "$stationID"}).Node
+    
+    # Split the string into an array so each item can be assigned based on its format
+    $metarArray = ($metarXML.raw_text).Split(" ")
+
+}
+
+
 
 ######################################################################################
 # Functions 
 
 # To convert Zulu time to EST time
 function Convert-ToLocal(){
-    $zulu = $metarapi.rawOb.Split(" ") | Where-Object {($_ -like "*Z")}
+    $zulu = $metarArray | Where-Object {($_ -like "*Z")}
     $zulu = ([int]$zulu.Substring(2,4))
 
     $DSTCheck = Get-Date
@@ -75,7 +95,29 @@ function convertToFahrenheit($C){
 
 # Convert Wind Information
 
-function Convert-Winds(){
+function Convert-WindsXML(){
+    $windOutput = $null
+
+    if ($metarXML.Wind_speed_kt -eq 0) {
+        $windOutput = "Winds calm"
+    }
+    elseif (($metarXML.Wind_speed_kt -ge 1) -and ($metarXML.Wind_gust_kt -lt 0)){
+        $windSpeed = $metarXML.Wind_speed_kt
+    }
+    elseif (($metarXML.Wind_speed_kt -ge 1) -and ($metarXML.Wind_gust_kt -gt 0)) {
+        $windSpeed = "$($metarXML.Wind_speed_kt) - $($metarXML.Wind_gust_kt)"
+    }
+
+    $windOutput = "$($metarXML.wind_dir_degrees)° at $($windSpeed) kts"
+    return $windOutput
+
+}
+
+##############################################
+
+# Convert Wind Information
+
+function Convert-WindsAPI(){
     $windOutput = $null
     if ($metarAPI.wspd -eq 0) {
         $windOutput = "Winds calm"
@@ -95,7 +137,7 @@ function Convert-Winds(){
 ##############################################
 
 # Cloud Conversion
-function Convert-Clouds(){
+function Convert-CloudsAPI(){
     # Create new variable for arraylist
     $cloudOutput = @()
 
@@ -115,11 +157,32 @@ function Convert-Clouds(){
     return $cloudOutput
 }
 
+##############################################
+
+# Cloud Conversion
+function Convert-CloudsXML(){
+    # Create new variable for arraylist
+    $cloudOutput = @()
+
+    foreach($cloud in $metarXML.sky_condition){
+        switch($cloud){
+                { ($_.sky_cover -eq "CLR") } { $cloudOutput  = "Clear below 12,000" }
+                { ($_.sky_cover -eq "FEW") } { $cloudOutput += "Few" + " " + ("{0:N0}" -f $($_.cloud_base_ft_agl)) + "'"     }
+                { ($_.sky_cover -eq "SCT") } { $cloudOutput += "Scattered" + " " + ("{0:N0}" -f $($_.cloud_base_ft_agl)) + "'"     }
+                { ($_.sky_cover -eq "BKN") } { $cloudOutput += "Broken" + " " + ("{0:N0}" -f $($_.cloud_base_ft_agl)) + "'"      }
+                { ($_.sky_cover -eq "OVC") } { $cloudOutput += "Overcast" + " " + ("{0:N0}" -f $($_.cloud_base_ft_agl)) + "'"      }
+        }
+    }
+
+    return $cloudOutput
+}
+
+
 ######################################################################################
 
 function Convert-altimeter(){
     # Parcel Altimeter from raw data
-    $altimeter = (($metarAPI.rawOb).Split(" ") | Where-Object {($_.Length -eq 5) -and ($_ -like "*A*") -and ($_ -notlike "*METAR*")}).Substring(1,4)/100
+    $altimeter = ($metarArray | Where-Object {($_.Length -eq 5) -and ($_ -like "*A*") -and ($_ -notlike "*METAR*")}).Substring(1,4)/100
     $altimeter = "{0:F2}" -f $altimeter
 
     return $altimeter
@@ -181,7 +244,7 @@ return $DA
 
 #Assembled 
 
-function Convert-Metar($metar){
+function Convert-MetarAPI($metar){
 
     # Create new variable for ordered hashtable
     $metarOutput = [ordered]@{}
@@ -194,14 +257,14 @@ function Convert-Metar($metar){
     $metarOutput.Add("Time",$convertedTime)
 
     # Wind
-    $convertedWinds = Convert-Winds
+    $convertedWinds = Convert-WindsAPI
     $metarOutput.Add("Wind",$convertedWinds)
 
     # Visibility
     $metarOutput.Add("Visibility","$($metarAPI.visib) sm")
 
     # Clouds
-    $convertedClouds = Convert-Clouds
+    $convertedClouds = Convert-CloudsAPI
     $metarOutput.Add("Clouds (AGL)",$convertedClouds)
 
     # Temperature
@@ -230,5 +293,60 @@ function Convert-Metar($metar){
 #end of function
 }
 
+function Convert-MetarXML($metar){
+
+    # Create new variable for ordered hashtable
+    $metarOutput = [ordered]@{}
+
+    # RAW Metar
+    $metarOutput.Add("METAR",$($metarXML.raw_text))
+
+    # Time
+    $convertedTime = Convert-ToLocal
+    $metarOutput.Add("Time",$convertedTime)
+
+    # Wind
+    $convertedWinds = Convert-WindsXML
+    $metarOutput.Add("Wind",$convertedWinds)
+
+    # Visibility
+    $metarOutput.Add("Visibility","$($metarXML.visibility_statute_mi) sm")
+
+    # Clouds
+    $convertedClouds = Convert-CloudsXML
+    $metarOutput.Add("Clouds (AGL)",$convertedClouds)
+
+    # Temperature
+    $convertedTemp = Convert-Temperature($metarXML.temp_c)
+
+    $metarOutput.Add("Temperature",$convertedTemp)
+
+    # Dewpoint
+    $convertedDew = Convert-Temperature($metarXML.dewpoint_c)
+    $metarOutput.Add("Dewpoint",$convertedDew)
+
+    # Altimeter
+    $converterAltimeter = Convert-Altimeter
+    $metarOutput.Add("Altimeter","$converterAltimeter inHg")
+
+    # Humidity
+    $humidity = Get-RelativeHumidity -temp $metarXML.temp_c -dewp $metarXML.dewpoint_c
+    $metarOutput.Add("Humidity","$humidity%")
+
+    # Density Altitude
+    $DA = Get-DensityAltitude -altimeter $converterAltimeter
+    $metarOutput.Add("Density Altitude (incorrect, due to wrong field elevation in API","$DA'")
+
+    return $metarOutput
+
+#end of function
+}
+
 # Run the function to pull the metar and convert it to readable text.
-Convert-Metar -metar $metarAPI 
+if($queryCache){
+    Write-Output "Fetching Metar from Cache File:"
+    Convert-MetarXML -metar $metarXML
+} else {
+    Write-Output "Fetching Metar from API Request:"
+    Convert-MetarAPI -metar $metarAPI 
+}
