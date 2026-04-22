@@ -1,13 +1,20 @@
-﻿# Simple Powershell RAW Metar Converter Project
+﻿######################################################################################
+
+# Simple Powershell RAW Metar Converter Project
 # Created by Philip Casey
+
 ######################################################################################
 
 # Input the full airport identifier
-$stationID = "KGGE"
-$queryCache = $false
+$stationID = "KMKS"
+$queryCache = $true
 
 ######################################################################################
+# Set Directory
+$rootDir = "Z:\PowerShell Scripts\PowerShell\"
+$metarDir = Resolve-Path (Join-Path $rootDir 'Metar')
 
+######################################################################################
 # GET Metar from Aviation Weather Center API
 $metarAPI = curl.exe -X 'GET' "https://aviationweather.gov/api/data/metar?ids=$stationID&format=json" -H 'accept: */*' 2>$null | ConvertFrom-Json
 
@@ -19,12 +26,22 @@ $metarArray = ($metarAPI.rawOb).Split(" ")
 if($queryCache){
     #https://aviationweather.gov/data/cache/metars.cache.xml.gz
     #You need to Unzip the GZ file to get the XML
+    function Get-MetarCache(){
+        # Download File from Web
+        $outfile = "$metarDir\metars.cache.xml.gz"
+        Invoke-WebRequest -Uri "https://aviationweather.gov/data/cache/metars.cache.xml.gz" -OutFile $outfile
+        
+        #Unzip GZ file using 7Zip
+        if(Test-path $outfile){
+            & "C:\Program Files\7-Zip\7z.exe" e $outfile -o"$metarDir" -aoa -y
+        }
+    }
 
-    #<Create function to download and unzip GZ file>
+    Get-MetarCache
 
     # Import XML file
-    [xml]$metarCached = Get-Content "Z:\PowerShell Scripts\PowerShell\Metar\metars.cache.xml"
-    $metarXML = (Select-Xml -Path "Z:\PowerShell Scripts\PowerShell\Metar\metars.cache.xml" -XPath "//METAR" | where {$_ -match "$stationID"}).Node
+    [xml]$metarCached = Get-Content "$metarDir\metars.cache.xml"
+    $metarXML = (Select-Xml -Path "$metarDir\metars.cache.xml" -XPath "//METAR" | where {$_ -match "$stationID"}).Node
     
     # Split the string into an array so each item can be assigned based on its format
     $metarArray = ($metarXML.raw_text).Split(" ")
